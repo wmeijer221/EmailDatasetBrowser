@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.HashSet;
 
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Chunk;
@@ -15,6 +16,7 @@ import com.itextpdf.text.DocumentException;
 import com.itextpdf.text.Font;
 import com.itextpdf.text.FontFactory;
 import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.BaseFont;
 import com.itextpdf.text.pdf.PdfWriter;
 
 import nl.andrewl.email_indexer.data.EmailEntryPreview;
@@ -25,13 +27,22 @@ import nl.andrewl.email_indexer.data.EmailRepository;
  */
 public final class PdfExporter implements ResultsExporter {
 
-    public static Font HEADER_TEXT = FontFactory.getFont(FontFactory.COURIER, 16, Font.BOLD, BaseColor.BLACK);
-    public static Font SUBHEADER_TEXT = FontFactory.getFont(FontFactory.COURIER, 12, Font.BOLD, BaseColor.BLACK);
-    public static Font REGULAR_TEXT = FontFactory.getFont(FontFactory.COURIER, 11, BaseColor.BLACK);
+    public static Font HEADER_TEXT = FontFactory.getFont(FontFactory.COURIER, FontFactory.defaultEncoding,
+            BaseFont.EMBEDDED, 16, Font.BOLD, BaseColor.BLACK);
+    public static Font SUBHEADER_TEXT = FontFactory.getFont(FontFactory.COURIER, FontFactory.defaultEncoding,
+            BaseFont.EMBEDDED, 12, Font.BOLD, BaseColor.BLACK);
+    public static Font REGULAR_TEXT = FontFactory.getFont(FontFactory.COURIER, FontFactory.defaultEncoding,
+            BaseFont.EMBEDDED, 11, Font.NORMAL, BaseColor.BLACK);
+
+    // HACK: this circumvents a bug in the recursiveLoad method in the email
+    // repository.
+    private HashSet<String> processedMailTracker;
 
     @Override
     public void writeExport(List<EmailEntryPreview> emails, EmailRepository repo, String query, Path file,
             Consumer<String> messageConsumer) throws IOException {
+
+        this.processedMailTracker = new HashSet<String>();
 
         File workingDirFile = new File(file.getParent().toString() + "/output/");
         workingDirFile.mkdirs();
@@ -101,6 +112,12 @@ public final class PdfExporter implements ResultsExporter {
     private void exportEmailThread(Document document, EmailEntryPreview email, EmailRepository repository,
             String emailId)
             throws DocumentException {
+
+        if (processedMailTracker.contains(email.messageId())) {
+            return;
+        } else {
+            processedMailTracker.add(email.messageId());
+        }
 
         addText("Email " + emailId, document, HEADER_TEXT);
 
